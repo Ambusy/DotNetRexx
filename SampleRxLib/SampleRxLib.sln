@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2041
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "SampleRxLib", "SampleRxLib.vbproj", "{8A9E6722-61A1-46CE-BA0F-DBB377669E8F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{77F25FB3-C933-4105-B620-EA7570335C48} = {77F25FB3-C933-4105-B620-EA7570335C48}
+	EndProjectSection
+EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "RxLib", "..\RxLib\RxLib.vbproj", "{77F25FB3-C933-4105-B620-EA7570335C48}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8A9E6722-61A1-46CE-BA0F-DBB377669E8F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A9E6722-61A1-46CE-BA0F-DBB377669E8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A9E6722-61A1-46CE-BA0F-DBB377669E8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A9E6722-61A1-46CE-BA0F-DBB377669E8F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77F25FB3-C933-4105-B620-EA7570335C48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77F25FB3-C933-4105-B620-EA7570335C48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77F25FB3-C933-4105-B620-EA7570335C48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77F25FB3-C933-4105-B620-EA7570335C48}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {3F3405F2-2D59-4C54-8258-8DDC238F994A}
+	EndGlobalSection
+EndGlobal
