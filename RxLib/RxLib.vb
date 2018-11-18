@@ -1,4 +1,4 @@
-﻿Imports VB6 = Microsoft.VisualBasic
+Imports VB6 = Microsoft.VisualBasic
 Imports System.Globalization
 Imports System.IO
 #Const CreRexxLogFile = False
@@ -292,7 +292,7 @@ Namespace Rexx
             RcComp = 0
             RexxFileName = Filename
             If Right(RexxFileName, 4).ToUpper(CultInf) <> ".REX" Then RexxFileName = RexxFileName & ".REX"
-            If InStr(RexxFileName, "\") = 0 Then
+            If Not CurrRexxRun.InInterpret AndAlso InStr(RexxFileName, "\") = 0 Then
                 Logg("RexxPath = : " & RexxPath)
                 RexxPathElements = Split(RexxPath, ";"c)
                 Dim fnd As Boolean = False
@@ -3243,11 +3243,17 @@ Namespace Rexx
                     Case fct.itp
                         MemorySource = FromStack()
                         CurrRexxRun.InInterpret = True
+                        Stack.Add(CurrRexxRun.SrcLine)
+                        Stack.Add(CurrRexxRun.SrcPos)
                         SaveRegs()
+                        CurrRexxRun.SrcPos = 0
+                        CurrRexxRun.SrcLine = 0
                         If CompileRexxScript("In memory source") = 0 Then
                             ExecuteRexxScript("")
                         End If
                         RestRegs()
+                        CurrRexxRun.SrcPos = CInt(FromStack())
+                        CurrRexxRun.SrcLine = CInt(FromStack())
                         CurrRexxRun.InInterpret = False
                     Case fct.lbl
                         If (CurrRexxRun.TraceLevel = 2) Then
