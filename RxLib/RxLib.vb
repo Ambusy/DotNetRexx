@@ -1,4 +1,4 @@
-Imports VB6 = Microsoft.VisualBasic
+﻿Imports VB6 = Microsoft.VisualBasic
 Imports System.Globalization
 Imports System.IO
 #Const CreRexxLogFile = False
@@ -28,6 +28,7 @@ Namespace Rexx
         Private DecimalSepPt As Boolean ' . is decimal separator and not ,
         Private cSymb As Symbols ' current symbol
         Private cChara As Char ' first char after cSymb
+        Private prChara As Char ' char preceding cChara    
         Private cId As String = "" ' current identifier
         Private cRwrd As RexxWord ' rexx words
         Private DefVars As DefVariable ' current definition variable structure
@@ -292,7 +293,7 @@ Namespace Rexx
             RcComp = 0
             RexxFileName = Filename
             If Right(RexxFileName, 4).ToUpper(CultInf) <> ".REX" Then RexxFileName = RexxFileName & ".REX"
-            If Not CurrRexxRun.InInterpret AndAlso InStr(RexxFileName, "\") = 0 Then
+            If InStr(RexxFileName, "\") = 0 Then
                 Logg("RexxPath = : " & RexxPath)
                 RexxPathElements = Split(RexxPath, ";"c)
                 Dim fnd As Boolean = False
@@ -1427,6 +1428,7 @@ Namespace Rexx
             If cSymb = Symbols.semicolon Then GetNextSymbol()
             If gLnr Then GenerateLinenumberIndication()
         End Sub
+        Dim LineTransit As Boolean = False
         Private Sub GetNextChar()
             If Not CurrRexxRun.InInterpret Then
                 GetCh1(CurrRexxRun.Source)
@@ -1439,6 +1441,7 @@ Namespace Rexx
                 cChara = CChar(ncChar)
                 ncChar = ""
             Else
+                LineTransit = False
                 CurrRexxRun.SrcPos = CurrRexxRun.SrcPos + 1
                 Dim sr As LineOfSource = DirectCast(Source.Item(CurrRexxRun.SrcLine), LineOfSource)
                 If CurrRexxRun.SrcPos >= sr.Text.Length Then
@@ -1450,15 +1453,17 @@ Namespace Rexx
                         CurrRexxRun.SrcPos = 0
                         sr = DirectCast(Source.Item(CurrRexxRun.SrcLine), LineOfSource)
                         cChara = sr.Text(CurrRexxRun.SrcPos)
+                        LineTransit = True
                     End If
                 Else
                     cChara = sr.Text(CurrRexxRun.SrcPos)
                 End If
-                If cChara = ","c AndAlso CurrRexxRun.SrcPos = sr.Text.Length - 1 Then
+                If cChara = ","c AndAlso CurrRexxRun.SrcPos = sr.Text.Length - 1 Then ' continuation char
                     CurrRexxRun.SrcLine = CurrRexxRun.SrcLine + 1
                     CurrRexxRun.SrcPos = 0
                     sr = DirectCast(Source.Item(CurrRexxRun.SrcLine), LineOfSource)
                     cChara = sr.Text(CurrRexxRun.SrcPos)
+                    LineTransit = True
                 End If
             End If
         End Sub
@@ -1514,7 +1519,11 @@ Namespace Rexx
                         GetNextChar()
                         While (cChara <> och And Not eofRexxFile)
                             cId = cId & cChara
+                            prChara = cChara
                             GetNextChar()
+                            If LineTransit AndAlso prChara = ";" Then
+                                SigError(120)
+                            End If
                         End While
                         If eofRexxFile Then SigError(120)
                         GetNextChar()
@@ -1836,13 +1845,17 @@ Namespace Rexx
             If cSymb = Symbols.lowersym Then asy = "lowersym"
         End Sub
         Sub dumpVars()
+            Dim n As Integer = 0
             Debug.WriteLine("Defined")
             For Each V As DefVariable In CurrRexxRun.IdName
-                Debug.WriteLine("'" & V.Id & "' " & V.Kind)
+                n += 1
+                Debug.WriteLine(CStr(n) + " '" & V.Id & "' " & V.Kind)
             Next
             Debug.WriteLine("Runtime")
+            n = 0
             For Each V As VariabelRun In CurrRexxRun.RuntimeVars
-                Debug.WriteLine("'" & V.Id & "' " & V.Level & " |" & V.IdValue & "|")
+                n += 1
+                Debug.WriteLine(CStr(n) + " '" & V.Id & "' " & V.Level & " |" & V.IdValue & "|")
             Next
         End Sub
 #End If
@@ -2227,6 +2240,7 @@ Namespace Rexx
             If NxtWordFromStr = "" Then If Not IsNothing(Def) Then NxtWordFromStr = Def
             NxtWordFromStr = NxtWordFromStr.ToUpper(CultInf)
         End Function
+        Dim LineExecuting As Integer = 0
         Private Sub ExecuteIntCode(ByRef CommandParm As String)
             Dim asm As New AsmStatement
             Dim asmp1 As New AsmStatement
@@ -2289,6 +2303,7 @@ Namespace Rexx
                             CurrRexxRun.InteractiveTracing = 1
                             CurrRexxRun.TraceLevel = 3
                         End If
+                        LineExecuting = cL
                         If (CurrRexxRun.TraceLevel > 2) Then traceLin(cL)
                     Case fct.lod
                         Select Case cL
@@ -2470,7 +2485,7 @@ Namespace Rexx
                         For i = 1 To cL
                             asmp1 = DirectCast(CurrRexxRun.IntCode.Item(IntPp + i), AsmStatement) ' fct.cll statement
                             If asmp1.a <> -1 Then ' not empty
-                                VariaRuns = GetNm(asmp1.a, n, en, k)
+                                VariaRuns = GetNmFunc(asmp1.a, n, en, k)
                                 m = VariaRuns.IdValue
                                 pm(i) = True
                             Else
@@ -3243,17 +3258,11 @@ Namespace Rexx
                     Case fct.itp
                         MemorySource = FromStack()
                         CurrRexxRun.InInterpret = True
-                        Stack.Add(CurrRexxRun.SrcLine)
-                        Stack.Add(CurrRexxRun.SrcPos)
                         SaveRegs()
-                        CurrRexxRun.SrcPos = 0
-                        CurrRexxRun.SrcLine = 0
                         If CompileRexxScript("In memory source") = 0 Then
                             ExecuteRexxScript("")
                         End If
                         RestRegs()
-                        CurrRexxRun.SrcPos = CInt(FromStack())
-                        CurrRexxRun.SrcLine = CInt(FromStack())
                         CurrRexxRun.InInterpret = False
                     Case fct.lbl
                         If (CurrRexxRun.TraceLevel = 2) Then
@@ -3627,14 +3636,14 @@ Namespace Rexx
             End If
             Logg("Assign: " & VarName & "=|" & VarValue & "|")
         End Sub
-        Private Function VarIndex(VarName As String, Create As Boolean, Optional RunLvlSpec As Integer = -1) As Integer
+        Private Function VarIndex(VarName As String, Create As Boolean, Optional RunLvlSpec As Integer = -1, Optional InFunctions As Boolean = False) As Integer
             Dim Retval As Integer = 0
             Dim RunLvl As Integer = RunLvlSpec
             If RunLvl = -1 Then RunLvl = CurrRexxRun.CallStack.Count - 1
             If RunLvl = -1 Then RunLvl = 0
 
             Dim RunLvlp As Integer = RunLvl
-            If Not Create Then
+            If Not Create And Not InFunctions Then
                 If VarName.Length > 2 AndAlso VarName(1) = " "c AndAlso RunLvl > 0 Then
                     RunLvlp -= 1
                 End If
@@ -3685,8 +3694,21 @@ Namespace Rexx
                 Return DirectCast(CurrRexxRun.RuntimeVars(k), VariabelRun)
             End If
         End Function
+        Private Function GetNmFunc(ByVal a As Integer, ByRef n As String, ByRef en As String, ByRef k As Integer) As VariabelRun
+            DefVars = DirectCast(CurrRexxRun.IdName.Item(a), DefVariable)
+            k = VarIndex(DefVars.Id, False, -1, True) ' don't create if not exists
+            If k = 0 Then
+                Return Nothing
+            Else
+                Return DirectCast(CurrRexxRun.RuntimeVars(k), VariabelRun)
+            End If
+        End Function
         Private Sub RunError(ByRef n As Integer, ByRef s As String)
-            If MsgBox(SysMsg(200 + n) + " " + s, MsgBoxStyle.OkCancel) = MsgBoxResult.Cancel Then
+            Dim se As String = ""
+            If LineExecuting > 0 Then
+                se = CStr(LineExecuting) + " " + GetSLin(LineExecuting)
+            End If
+            If MsgBox(SysMsg(200 + n) + " '" + s + "'" + vbCrLf + se, MsgBoxStyle.OkCancel) = MsgBoxResult.Cancel Then
                 RaiseEvent doCancel()
                 CancRexx = True
             End If
