@@ -8,4 +8,4 @@ A specialized version is used in my Xedit project, simplified in some aspects, e
 
 To run the project in Visual Studio, you might need to open the My Project tab and adjust the .NET framework version, as installed on your pc. For further information see the Read Me in the SampleRxLib folder
 
-To run the samples, open the Release map in the BIN folder in SampleRxLib and execute SampleRxLib.exe
+To run the samples, open Release map in SampleRxLib/My Project/Bin folder and execute SampleRxLib.exe
