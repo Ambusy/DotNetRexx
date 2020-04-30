@@ -1,5 +1,5 @@
 /* */
-trace n
+trace i
 parse arg x, x1
 say "in recursive: " x  "|" x1
 if x = "" then x = 1
