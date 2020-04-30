@@ -23,7 +23,6 @@ Namespace Rexx
         Private IntPp As Integer ' ix in asm codetable
         Private RexxFileName As String = ""
         Private eofRexxFile As Boolean
-        'Private nBrOpen As Integer
         Private nErr As Integer
         Private DecimalSepPt As Boolean ' . is decimal separator and not ,
         Private cSymb As Symbols ' current symbol
@@ -33,7 +32,7 @@ Namespace Rexx
         Private cRwrd As RexxWord ' rexx words
         Private DefVars As DefVariable ' current definition variable structure
         Private VariaRuns As VariabelRun ' current execution variable structure
-#If Debug Or CreRexxLogFile Then
+#If DEBUG Then
         Private asrc As String = "", asy As String = "" ' for debugging
 #End If
         Private RcComp As Integer ' internal RC
@@ -43,7 +42,7 @@ Namespace Rexx
         Private Leave As New Collection ' leave names and indexes
         Private LeaveX As New Collection
         Private NumY As Double ' num. value of last checked number: if numeric, numY contains the float value
-        Private SrcLstLin, LastLnr As Integer ' current linenumbers
+        Private SrcLstLin As Integer ' current linenumber
         Private UpCase As Boolean ' next parse wants uppercase?
         Private iCurrParSeqNr, nDo, iParSeqNr, iMaxParSeqNr As Integer ' numbers to generate unique internal names
         Private GenTemp As Boolean ' generate temp code?
@@ -53,8 +52,7 @@ Namespace Rexx
         Private ncChar As String = "" ' added symbol at end-of-line
         Private sSrcPos, sSrcLine As Integer
         Private NrStepsExecuted As Integer = 0
-        Private EntriesInIntcode As Integer = 1 ' n° existing entries in IntCode
-        'Private ExiClin As Integer = 1 ' n° existing entries in IntCode
+        Private EntriesInIntcode As Integer = 1 ' nr existing entries in IntCode
 
         Private CultInf As New CultureInfo("en-US", False)
         Friend Stack As New Collection ' execution builtinroitines
@@ -73,9 +71,8 @@ Namespace Rexx
         Friend Shared CallDepth As Integer ' nesting of rexx programs, on 1: init or finish variables / buffers
 
         Event doCmd(ByVal env As String, ByVal c As String, ByVal e As RexxEvent, ByRef RexxEnv As Rexx)
-        '    Event doNewRexx(ByVal env As String, ByVal cmd As String, ByVal prm As String, ByVal e As RexxEvent, ByRef RexxEnv As Rexx)
         Event doCancel()
-        Event dosay(ByVal s As String)
+        Event doSay(ByVal s As String)
         Event doPull(ByRef s As String)
         Event doStep()
 
@@ -89,9 +86,6 @@ Namespace Rexx
         Private Const sAtoZ_0to9 As String = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
         Private Const ExtRoutineTagstring As String = "External Routine Parameters: "
         Private Const ExtRoutineParmSep As String = "0501040203"
-
-
-        ' Friend InputBx As New InputBoxDialog()
 
         Public Enum Symbols ' Rexx symbols
             addresym = 1
@@ -185,25 +179,25 @@ Namespace Rexx
             '                           code[].l = seqnr of parameter "P l"
             adr ' Address name          code[].a = idx of name
             cal ' call                  code[].a = idx of name to call, substituted by index in intcode after compile
-            '                           code[].l = n° of arguments in CALL
+            '                           code[].l = nr of arguments in CALL
             ret ' return
             exi ' exit
             lbl ' label def.            code[].a = level for local vars
             '                           code[].l = ident | procsym
             cle ' call external rex     code[].a = idx of name to call
-            arg ' ARG and helpers.      code[].a = n° arguments in ARG
-            '                           code[].l = seq n° of the parameter  
+            arg ' ARG and helpers.      code[].a = nr arguments in ARG
+            '                           code[].l = seq nr of the parameter  
             upp ' uppercase             code[].a = 1: UPPER
             parp ' +n                   code[].a = +/-number
-            '                           code[].l = seq n° in ARG
+            '                           code[].l = seq nr in ARG
             parc ' n abs.               code[].a = number
-            '                           code[].l = seq n° in ARG
+            '                           code[].l = seq nr in ARG
             parv ' variable             code[].a = index in IdName
-            '                           code[].l = seq n° in ARG
+            '                           code[].l = seq nr in ARG
             parl ' literal              code[].a = index in literalpool
-            '                           code[].l = seq n° in ARG
+            '                           code[].l = seq nr in ARG
             parh ' (variable)           code[].a = index in IdName
-            '                           code[].l = seq n° in ARG
+            '                           code[].l = seq nr in ARG
             pul ' pull (like ARG)
             pvr ' parse var (like ARG)
             pvl ' parse value (like ARG)
@@ -292,37 +286,39 @@ Namespace Rexx
             End If
             RcComp = 0
             RexxFileName = Filename
-            If Right(RexxFileName, 4).ToUpper(CultInf) <> ".REX" Then RexxFileName = RexxFileName & ".REX"
-            If InStr(RexxFileName, "\") = 0 Then
-                Logg("RexxPath = : " & RexxPath)
-                RexxPathElements = Split(RexxPath, ";"c)
-                Dim fnd As Boolean = False
-                For i = 0 To RexxPathElements.Length() - 1
-                    RexxPathElements(i) = RexxPathElements(i).Trim()
-                    If RexxPathElements(i) <> "" Then
-                        If RexxPathElements(i)(RexxPathElements(i).Length - 1) <> "\" Then
-                            RexxPathElements(i) += "\"
-                        End If
-                        If RexxPathElements(i)(0) = "%" Then
-                            Dim parts() As String = Split(RexxPathElements(i), "%"c)
-                            If parts.Length > 2 Then
-                                Dim s As String = Environment.GetEnvironmentVariable(parts(1))
-                                RexxPathElements(i) = s + parts(2)
+            If Filename <> "In memory source" Then
+                If Right(RexxFileName, 4).ToUpper(CultInf) <> ".REX" Then RexxFileName = RexxFileName & ".REX"
+                If InStr(RexxFileName, "\") = 0 Then
+                    Logg("RexxPath = : " & RexxPath)
+                    RexxPathElements = Split(RexxPath, ";"c)
+                    Dim fnd As Boolean = False
+                    For i = 0 To RexxPathElements.Length() - 1
+                        RexxPathElements(i) = RexxPathElements(i).Trim()
+                        If RexxPathElements(i) <> "" Then
+                            If RexxPathElements(i)(RexxPathElements(i).Length - 1) <> "\" Then
+                                RexxPathElements(i) += "\"
+                            End If
+                            If RexxPathElements(i)(0) = "%" Then
+                                Dim parts() As String = Split(RexxPathElements(i), "%"c)
+                                If parts.Length > 2 Then
+                                    Dim s As String = Environment.GetEnvironmentVariable(parts(1))
+                                    RexxPathElements(i) = s + parts(2)
+                                End If
+                            End If
+                            Logg("try : " + RexxPathElements(i) + RexxFileName)
+                            Logg("    : " + Path.GetFullPath(RexxPathElements(i) + RexxFileName))
+                            If File.Exists(RexxPathElements(i) + RexxFileName) Then
+                                RexxFileName = Path.GetFullPath(RexxPathElements(i) + RexxFileName)
+                                Logg("found " + RexxFileName)
+                                fnd = True
+                                Exit For
                             End If
                         End If
-                        Logg("try : " + RexxPathElements(i) + RexxFileName)
-                        Logg("    : " + Path.GetFullPath(RexxPathElements(i) + RexxFileName))
-                        If File.Exists(RexxPathElements(i) + RexxFileName) Then
-                            RexxFileName = Path.GetFullPath(RexxPathElements(i) + RexxFileName)
-                            Logg("found " + RexxFileName)
-                            fnd = True
-                            Exit For
-                        End If
+                    Next
+                    If Not fnd Then
+                        Logg("foundd " + ExecutablePath & RexxFileName)
+                        RexxFileName = ExecutablePath & RexxFileName
                     End If
-                Next
-                If Not fnd Then
-                    Logg("foundd " + ExecutablePath & RexxFileName)
-                    RexxFileName = ExecutablePath & RexxFileName
                 End If
             End If
             CallDepth += 1
@@ -331,7 +327,7 @@ Namespace Rexx
                 Logg("Comp file " & RexxFileName)
                 nErr = 0
                 nDo = 0
-                iParSeqNr = 100
+                iParSeqNr = 100 ' seq. nr for temp variables to transer parametervalues
                 iMaxParSeqNr = 0
                 iCurrParSeqNr = 0
                 EntriesInIntcode = 1
@@ -350,7 +346,6 @@ Namespace Rexx
                 Logg("Comp INTERPRET file " & RexxFileName)
             End If
             If RcComp = 0 Then
-                ' CurrRexxRun.SrcLine = 0
                 CurrRexxRun.SrcPos = -1
                 If Not CurrRexxRun.InInterpret Then
                     CurrRexxRun.Source.Clear()
@@ -366,13 +361,11 @@ Namespace Rexx
                     CurrRexxRun.IntCode.Clear()
                     CurrRexxRun.SrcLine = 1
                 Else
-                    'ExiClin = CurrRexxRun.SrcLine
-                    CurrRexxRun.SrcLine += 1
+                    CurrRexxRun.SrcLine = 1
                 End If
                 Logg("Comp compile rexx ")
                 CurrRexxRun.SrcPos = -1
                 eofRexxFile = False
-                'CurrRexxRun.RexxFile.Seek(0, SeekOrigin.Begin)
                 cChara = " "c
                 GetNextSymbol()
                 If RexxTrace Then
@@ -414,7 +407,7 @@ Namespace Rexx
                     If asm.f = fct.cal Then ' replace routinename by index in CurrRexxRun.IntCode
                         If asm.l = -1 Then asm.f = fct.jmp ' signal: jmp, not cal !
                         DefVars = DirectCast(CurrRexxRun.IdName.Item(asm.a), DefVariable)
-                        Dim asma As Integer = asm.a
+                        Dim asma As Integer = asm.a ' becomes indicator for addrexfunc routines
                         asm.a = 0
                         For j = 1 To CurrRexxRun.IxProcName.Count()
                             If CStr(CurrRexxRun.IxProcName.Item(j)) = DefVars.Id Then
@@ -490,7 +483,6 @@ Namespace Rexx
             Next
         End If
 #End If
-            ' end if extra in xedit???????????????
             Logg("Comp end " & CStr(RcComp))
             Return RcComp
         End Function
@@ -1208,7 +1200,7 @@ Namespace Rexx
                 If cSymb <> Symbols.comma Then ' not an empty parameter
                     ProcessCallParm(NrValues, vi, NrValues)
                     Pars.Add(vi) ' position of parameter id in names
-                    ParsN.Add(iCurrParSeqNr) ' seq n° of parm  
+                    ParsN.Add(iCurrParSeqNr) ' seq nr of parm  
                 Else
                     Pars.Add(-1)
                     ParsN.Add(-1)
@@ -1666,13 +1658,13 @@ Namespace Rexx
             If cChara = "'" Or cChara = """" Then
                 Dim clChar As Char = cChara
                 GetNextChar()
-                While cChara <> clChar
+                While cChara <> clChar AndAlso Not eofRexxFile
                     ccs = ccs & cChara
                     GetNextChar()
                 End While
                 GetNextChar()
             Else
-                While InStr(chars, cChara) > 0
+                While InStr(chars, cChara) > 0 AndAlso Not eofRexxFile
                     ccs = ccs & cChara
                     GetNextChar()
                 End While
@@ -1900,7 +1892,7 @@ Namespace Rexx
                     lSay = 0
                 End If
             Else
-                RaiseEvent dosay(s)
+                RaiseEvent doSay(s)
             End If
         End Sub
         Private Function ComposeSayFromBuffer() As String
@@ -1924,23 +1916,23 @@ Namespace Rexx
             CurrRexxRun.TxtValue.Add(literal)
             StoreLiteral = CurrRexxRun.TxtValue.Count()
         End Function
-        Public Function SourceNameIndexPosition(ByVal Name As String, ByVal Kind As tpSymbol, ByRef VariaDefs As DefVariable) As Integer
+        Public Function SourceNameIndexPosition(ByVal Name As String, ByVal Kind As tpSymbol, ByRef Variable As DefVariable) As Integer
             ' position of variable in list of defined sourcenames
             Dim i As Integer
             SourceNameIndexPosition = 0
             i = 0
-            For Each DefVars In CurrRexxRun.IdName
+            For Each Variable In CurrRexxRun.IdName
                 SourceNameIndexPosition = SourceNameIndexPosition + 1
-                If DefVars.Id = Name Then
+                If Variable.Id = Name Then
                     i = 1
                     Exit For
                 End If
-            Next DefVars
+            Next Variable
             If i = 0 Then
-                DefVars = New DefVariable
-                DefVars.Id = Name
-                DefVars.Kind = Kind
-                CurrRexxRun.IdName.Add(DefVars)
+                Variable = New DefVariable
+                Variable.Id = Name
+                Variable.Kind = Kind
+                CurrRexxRun.IdName.Add(Variable)
                 SourceNameIndexPosition = CurrRexxRun.IdName.Count()
             End If
         End Function
@@ -1951,6 +1943,7 @@ Namespace Rexx
                 If CallDepth = 1 Then
                     CurrRexxRun.TraceLevel = 0
                 End If
+                CurrRexxRun.InteractiveTracing = 0
                 ExecuteIntCode(params)
                 If CancRexx Then CallDepth = 1 ' abort all
                 If CallDepth = 1 And lSay > 0 Then
@@ -1976,7 +1969,7 @@ Namespace Rexx
                     Streams.Clear()
                 End If
             End If
-            'If Not CurrRexxRun.InInterpret Then CurrRexxRun.RuntimeVars.Clear()
+            If Not CurrRexxRun.InInterpret Then CurrRexxRun.RuntimeVars.Clear()
             Return CurrRexxRun.Rc
         End Function
         Private Sub FillRexxWord(ByVal s As String, ByVal Sym As Symbols, Optional ByVal Active As Boolean = True)
@@ -2263,7 +2256,7 @@ Namespace Rexx
             Dim nParMin As Integer
             Dim nParMax As Integer
             Dim ExtRoutine As Boolean = False
-#If Not Debug Then
+#If Not DEBUG Then
         Try
 #End If
             en = ""
@@ -2271,7 +2264,6 @@ Namespace Rexx
             If CurrRexxRun.InInterpret Then
                 IntPp = EntriesInIntcode + 1
             Else
-                'CurrRexxRun.RuntimeVars.Clear()
                 CurrRexxRun.CallStack.Clear()
                 Dim MainElem As New CallElem ' first callstack item is MAIN without exposed variables
                 MainElem.ProcNum = 0
@@ -2281,6 +2273,7 @@ Namespace Rexx
                 StoreVar(CurrRexxRun.iRc, "0", 0, "", "")
                 IntPp = 1
                 CurrRexxRun.ProcNum = 0 ' not if in interpret !!!!!
+                CurrRexxRun.sigNovalue = False
                 If CommandParm.StartsWith(ExtRoutineTagstring) Then
                     ExtRoutine = True
                 End If
@@ -2291,7 +2284,7 @@ Namespace Rexx
                 cF = asm.f
                 cL = asm.l
                 cA = asm.a
-#If Debug Or CreRexxLogFile Then
+#If DEBUG Or CreRexxLogFile Then
                 asrc = "L:" + CStr(IntPp) + " " & DumpStr(asm)
                 Logg(asrc)
 #End If
@@ -3341,7 +3334,7 @@ Namespace Rexx
                 End If
                 IntPp = IntPp + 1
             End While
-#If Not Debug Then
+#If Not DEBUG Then
         Catch e As Exception
             CurrRexxRun.Rc = 256
             MsgBox("Internal error in REXX interpretor: " & Err.Description & vbCrLf & "Current ReXXfile is: " & RexxFileName & vbCrLf & "Current executing line is: " & CStr(SrcLstLin) & vbCrLf & ".Net Full error description: " & vbCrLf & Err.GetException().ToString)
@@ -3372,6 +3365,7 @@ Namespace Rexx
             CurrRexxRun.CAddress = ""
         End Sub
         Private Sub SaveRegs()
+            Stack.Add(CurrRexxRun.SrcLine) ' interpret ruins
             Stack.Add(CurrRexxRun.InteractiveTracing)
             Stack.Add(CurrRexxRun.TraceLevel)
             Stack.Add(CurrRexxRun.RuntimeVars.Count())
@@ -3390,6 +3384,7 @@ Namespace Rexx
             Dim i As Short = CShort(FromStack())
             CurrRexxRun.TraceLevel = CShort(FromStack())
             CurrRexxRun.InteractiveTracing = CShort(FromStack())
+            CurrRexxRun.SrcLine = CShort(FromStack())
             Return i
         End Function
         Private Function OpenStream(ByVal fn As String, ByVal rw As String) As String
@@ -3582,11 +3577,11 @@ Namespace Rexx
                 End If
             End If
             If (CurrRexxRun.TraceLevel > 3) Then
-#If Not Debug Then
+#If Not DEBUG Then
             If Mid(ExeName, 2, 1) <> " " Then
 #End If
                 traceVar("v", RexxName, GetVar)
-#If Not Debug Then
+#If Not DEBUG Then
             End If
 #End If
             End If
@@ -3626,11 +3621,11 @@ Namespace Rexx
             Var.IdValue = VarValue
             VarExePosition = k
             If (CurrRexxRun.TraceLevel >= 3) Then
-#If Not Debug Then
+#If Not DEBUG Then
             If Mid(VarName, 2, 1) <> " " Then ' not internal variable
 #End If
                 traceVar("r", VarName, VarValue)
-#If Not Debug Then
+#If Not DEBUG Then
             End If
 #End If
             End If
@@ -3804,7 +3799,7 @@ Namespace Rexx
                         Dim wfn As String
                         wfn = CreateNameOfWorkfile()
                         Dim sw As New StreamWriter(wfn)
-                        sw.Write(s & ";")
+                        sw.Write("/* */ " & s & ";")
                         sw.Close()
                         CurrRexxRun.InInterpret = True
                         CurrRexxRun.InInteractive = True
@@ -3820,7 +3815,10 @@ Namespace Rexx
                         RexxTrace = sTrace
                         CurrRexxRun.InInterpret = False
                         CurrRexxRun.InInteractive = False
-                        File.Delete(wfn)
+                        Try
+                            File.Delete(wfn)
+                        Catch ex As Exception
+                        End Try
                         s = InputBox(s + vbCrLf + "Interactive debug", "Enter statement or ?", "")
                     End If
                 Loop
@@ -3929,7 +3927,7 @@ Namespace Rexx
             Dim MainParmIsRout As Boolean = False
             l1 = 0
             asmParse = DirectCast(CurrRexxRun.IntCode.Item(IntPp), AsmStatement)
-            If (asmParse.f = fct.arg) Then ' check n° arguments passed
+            If (asmParse.f = fct.arg) Then ' check nr arguments passed
                 CallStackElement = DirectCast(CurrRexxRun.CallStack(CurrRexxRun.CallStack.Count), CallElem)
                 If Not (CurrRexxRun.CallStack.Count = 1 AndAlso CallStackElement.InternDepth = 0) Then ' caller and routine in same script?
                     asmCallingLine = DirectCast(CurrRexxRun.IntCode.Item(CInt(Stack.Item(Stack.Count()))), AsmStatement) ' cal statement  
@@ -4300,7 +4298,7 @@ Namespace Rexx
             Return res
         End Function
         Private Function ReadSource(src As Collection, longName As String) As Integer
-            If longName <> "In memory source.REX" Then
+            If longName <> "In memory source" Then
                 ReadSource = ReadSourceFile(src, longName)
             Else
                 Dim s As New LineOfSource
@@ -4332,6 +4330,9 @@ Namespace Rexx
                     If nSkip > 0 Then
                         nSkip -= 1
                     Else
+                        If iFile = 1 AndAlso ch = 63 Then
+                            ssd.SrcStart = 2 ' skip ?: BOM indicator for windows utf8 file encoder
+                        End If
                         If iFile = 1 AndAlso ch = 255 Then
                             IsUnicodeh = True
                         ElseIf iFile = 2 AndAlso IsUnicodeh AndAlso ch = 254 Then
@@ -4403,7 +4404,7 @@ Namespace Rexx
         Friend Text As String
     End Class
     Friend Class CallElem
-        Friend ProcNum As Integer    ' n° in source of proc
+        Friend ProcNum As Integer    ' nr in source of proc
         Friend InternDepth As Integer    ' internal call depth
         Friend Exposes As Collection ' strings of names to expose
     End Class
