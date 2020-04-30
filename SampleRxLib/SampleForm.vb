@@ -161,7 +161,7 @@ Public Class SampleForm
         ' note: form.keypreview is set to intercept keys at form-level.
         '
     End Sub
-    Friend Sub RexxSay(ByVal s As String) Handles Rx.dosay
+    Friend Sub RexxSay(ByVal s As String) Handles Rx.doSay
         ' give a message to the user
         If MsgBox(s, MsgBoxStyle.OkCancel) = MsgBoxResult.Cancel Then
             Rexx.CancRexx = True
@@ -191,7 +191,7 @@ Public Class DoRexx
     Private Sub RexxStep() Handles Rxn.doStep
         SampleForm.RexxStep()
     End Sub
-    Private Sub RexxSay(ByVal s As String) Handles Rxn.dosay
+    Private Sub RexxSay(ByVal s As String) Handles Rxn.doSay
         SampleForm.RexxSay(s)
     End Sub
     Private Sub RexxPull(ByRef s As String) Handles Rxn.doPull
