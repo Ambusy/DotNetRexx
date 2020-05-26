@@ -61,7 +61,7 @@ Namespace Rexx
         Friend Shared SayLine(24) As String ' say buffer for all routines
         Friend Shared lSay, nSay As Integer
         Friend Shared RexxWords As New Collection ' symbols for compiler
-        Friend Shared RexxFunctions(44) As String ' builtin functions with parameter definitions
+        Friend Shared RexxFunctions(46) As String ' builtin functions with parameter definitions
         Friend Shared SymsStr(78) As String ' names of symbols for errors
         Friend Shared SysMessages As New Collection ' text of messages
         Public Shared QStack As New Collection ' Queue/Pull Stack
@@ -2122,6 +2122,7 @@ Namespace Rexx
             i = i + 1 : RexxFunctions(i) = "02SSII     CHAROUT"
             i = i + 1 : RexxFunctions(i) = "01S        CHARS"
             i = i + 1 : RexxFunctions(i) = "02SSS      COMPARE"
+            i = i + 1 : RexxFunctions(i) = "02SS       CONTAINS"
             i = i + 1 : RexxFunctions(i) = "02SI       COPIES"
             i = i + 1 : RexxFunctions(i) = "01SS       DATATYPE"
             i = i + 1 : RexxFunctions(i) = "00S        DATE"
@@ -2143,6 +2144,7 @@ Namespace Rexx
             i = i + 1 : RexxFunctions(i) = "03SSS      REGEXP"
             i = i + 1 : RexxFunctions(i) = "01S        REVERSE"
             i = i + 1 : RexxFunctions(i) = "02SIS      RIGHT"
+            i = i + 1 : RexxFunctions(i) = "01RI       ROUND"
             i = i + 1 : RexxFunctions(i) = "01R        SIGN"
             i = i + 1 : RexxFunctions(i) = "02SSS      STREAM"
             i = i + 1 : RexxFunctions(i) = "01SSS      STRIP"
@@ -2548,6 +2550,15 @@ Namespace Rexx
                                 End If
                             Case "INDEX"
                                 m = CStr(InStr(ps(1), ps(2)))
+                            Case "CONTAINS"
+                                m = "0"
+                                If ps(2).EndsWith(".") Then
+                                    For Each v As VariabelRun In CurrRexxRun.RuntimeVars
+                                        If v.IdValue = ps(1) AndAlso v.Id.StartsWith(ps(2)) Then
+                                            m = v.Id.Substring(ps(2).Length)
+                                        End If
+                                    Next
+                                End If
                             Case "POS"
                                 If cL < 3 Then pi(3) = 1
                                 m = CStr(InStr(pi(3), ps(2), ps(1)))
@@ -2795,6 +2806,10 @@ Namespace Rexx
                             Case "DELSTR"
                                 If Not pm(3) Then pi(3) = ps(1).Length() - pi(2) + 1
                                 m = Mid(ps(1), 1, pi(2) - 1) & Mid(ps(1), pi(2) + pi(3))
+                            Case "ROUND"
+                                If cL < 2 Then pi(2) = 0
+                                m = CStr(Math.Round(pr(1), pi(2)))
+                                If Not DecimalSepPt Then m = Translate(m, ".,", ",.")
                             Case "SIGN"
                                 If pr(1) = 0 Then
                                     m = "0"
@@ -2884,6 +2899,15 @@ Namespace Rexx
                                                 m = OpenStream(ps(1), rw)
                                             Case "CLOSE"
                                                 m = CloseStream(ps(1))
+                                            Case "RESET"
+                                                If Streams.Contains(ps(1)) Then
+                                                    m = CloseStream(ps(1))
+                                                Else
+                                                    m = "READY"
+                                                End If
+                                                If m = "READY" Then
+                                                    File.Delete(ps(1))
+                                                End If
                                             Case "SEEK"
                                                 Dim ofs As Integer
                                                 str = DirectCast(Streams.Item(ps(1)), aStream)
@@ -2954,7 +2978,7 @@ Namespace Rexx
                                     str = DirectCast(Streams.Item(ps(1)), aStream)
                                     Dim returnCount As Integer
                                     returnCount = 0 ' no lines found
-                                    If tCnt = "C" Then ' count nï¿½ of lines
+                                    If tCnt = "C" Then ' count nï¿½ of lines left
                                         rp = str.ReadPos
                                         Dim crlf As Integer
                                         While str.ReadPos < str.FileStr.Length()
@@ -3010,15 +3034,22 @@ Namespace Rexx
                                 If m <> "ERROR" Then
                                     Dim str As aStream
                                     str = DirectCast(Streams.Item(ps(1)), aStream)
-                                    If Not pm(2) And Not pm(3) Then
-                                        m = CloseStream(ps(1))
-                                    Else
-                                        If pm(3) Then
-                                            GotoStreamLine(str, pi(3)) ' start at line
-                                            str.WritePos = str.ReadPos
+                                    If Not str.FileStr.CanWrite Then
+                                        CloseStream(ps(1))
+                                        m = OpenStream(ps(1), "W")
+                                        str = DirectCast(Streams.Item(ps(1)), aStream)
+                                    End If
+                                    If m <> "ERROR" Then
+                                        If Not pm(2) And Not pm(3) Then
+                                            m = CloseStream(ps(1))
+                                        Else
+                                            If pm(3) Then
+                                                GotoStreamLine(str, pi(3)) ' start at line
+                                                str.WritePos = str.ReadPos
+                                            End If
+                                            m = StreamWriteLine(str, ps(2), True)
+                                            str.WritePos += ps(2).Length() + 2
                                         End If
-                                        m = StreamWriteLine(str, ps(2), True)
-                                        str.WritePos += ps(2).Length() + 2
                                     End If
                                 End If
                             Case "CHARS"
@@ -3062,21 +3093,28 @@ Namespace Rexx
                                 If m <> "ERROR" Then
                                     Dim str As aStream, mc As Integer
                                     str = DirectCast(Streams.Item(ps(1)), aStream)
-                                    If Not pm(2) And Not pm(3) Then
-                                        m = CloseStream(ps(1))
-                                    Else
-                                        If pm(3) Then
-                                            str.WritePos = pi(3) - 1
-                                        End If
-                                        If pm(4) Then
-                                            mc = pi(4)
-                                        Else
-                                            mc = 1
-                                        End If
-                                        m = StreamWriteLine(str, ps(2).Substring(0, mc), False)
-                                        str.WritePos += mc
+                                    If Not str.FileStr.CanWrite Then
+                                        CloseStream(ps(1))
+                                        m = OpenStream(ps(1), "W")
+                                        str = DirectCast(Streams.Item(ps(1)), aStream)
                                     End If
-                                End If
+                                    If m <> "ERROR" Then
+                                        If Not pm(2) And Not pm(3) Then
+                                            m = CloseStream(ps(1)) ' stream
+                                        Else
+                                            If pm(3) Then ' start in file
+                                                str.WritePos = pi(3) - 1
+                                            End If
+                                            If pm(4) Then ' nr chars
+                                                mc = pi(4)
+                                            Else
+                                                mc = ps(2).Length
+                                            End If
+                                            m = StreamWriteLine(str, ps(2).Substring(0, mc), False)
+                                            str.WritePos += mc
+                                        End If
+                                        end if
+                                    End If
                             Case "REGEXP"
                                 Dim mc As MatchCollection
                                 Dim rVar As String = ps(1)
@@ -4279,6 +4317,11 @@ Namespace Rexx
             Next
             x = y
             l = x.Length()
+            Dim l1 As Integer = l Mod 8
+            If l1 > 0 Then
+                x = "0000000".Substring(0, 8 - l1) + x
+                l = x.Length()
+            End If
             res = ""
             j = 0
             h = 0
