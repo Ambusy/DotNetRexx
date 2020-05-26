@@ -10,3 +10,5 @@ To run the project in Visual Studio, you might need to open the My Project tab a
 
 To run the samples, open Release map in SampleRxLib/
 Bin folder and execute SampleRxLib.exe
+
+To change the Rexx interpreter, open the SampleRxLib solution or the RxLib project in Visual Studio.
