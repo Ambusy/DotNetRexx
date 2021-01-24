@@ -101,7 +101,7 @@ Public Class SampleForm
                 For i As Integer = 2 To wrds.Length - 1 ' get the parameters
                     pars(i - 2) = RexxEnv.GetVar(RexxEnv.SourceNameIndexPosition(wrds(i).Trim, Rexx.tpSymbol.tpVariable, cvr), execName, srcName)
                 Next
-                'You do the inteface to the dll/modules:
+                'You do the interface to the dll/modules:
                 Select Case wrds(1).ToLower.Trim
                     Case "winmm.dll/mmioformat"
                         Dim mmio As mmioFormat = New mmioFormat(pars(0))

@@ -94,7 +94,7 @@ Public Class mmioFormat
         rc = mmioReadString(InputHandle, m_FormatBuffer, mmckinfoSubchunkIn.ckSize)
         If rc = -1 Then
             CloseFile()
-            ErrorMsg = "Couldn't read from WAVE file."
+            ErrorMsg = "Couldn't close WAVE file."
             Return "-1"
         End If
         rc = mmioAscend(InputHandle, mmckinfoSubchunkIn, 0)
