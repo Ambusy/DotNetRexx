@@ -397,14 +397,19 @@ Namespace Rexx
                 For i = EntriesInIntcode + 1 To CurrRexxRun.IntCode.Count() ' insert call addresses 
                     asm = DirectCast(CurrRexxRun.IntCode.Item(i), AsmStatement)
                     If asm.f = fct.lin Then cLn = asm.l ' report linenumber in case of errors
-                    If asm.f = fct.sig And asm.a > 0 Then ' replace labelname by index in currRexxRun.IntCode
-                        DefVars = DirectCast(CurrRexxRun.IdName.Item(asm.a), DefVariable)
-                        For j = 1 To CurrRexxRun.IxProcName.Count()
-                            If CStr(CurrRexxRun.IxProcName.Item(j)) = DefVars.Id Then
-                                k = CInt(CurrRexxRun.IxProc.Item(j)) - 1
-                                asm.a = k
-                            End If
-                        Next
+                    If asm.f = fct.sig Then ' replace labelname by index in currRexxRun.IntCode
+                        Dim nrVars As Integer = CurrRexxRun.IdName.Count()
+                        Dim xi As Integer = SourceNameIndexPosition("NOVALUE", tpSymbol.tpProcedure, DefVars) ' Find NOVALUE: label
+                        If CurrRexxRun.IdName.Count() <= nrVars Then ' not added now, so this is where to go in case of novalue
+                            asm.a = xi
+                            DefVars = DirectCast(CurrRexxRun.IdName.Item(asm.a), DefVariable)
+                            For j = 1 To CurrRexxRun.IxProcName.Count()
+                                If CStr(CurrRexxRun.IxProcName.Item(j)) = DefVars.Id Then
+                                    k = CInt(CurrRexxRun.IxProc.Item(j)) - 1
+                                    asm.a = k
+                                End If
+                            Next
+                        End If
                     End If
                     If asm.f = fct.sto Then
                         If asm.l > 0 Then
@@ -429,7 +434,7 @@ Namespace Rexx
                                 asm.l = 0 ' builtin or external
                             End If
                         End If
-                    End If  
+                    End If
                     If asm.f = fct.cal Then ' replace routinename by index in CurrRexxRun.IntCode
                         If asm.l = -1 Then asm.f = fct.jmp ' signal: jmp, not cal !
                         DefVars = DirectCast(CurrRexxRun.IdName.Item(asm.a), DefVariable)
@@ -928,7 +933,7 @@ Namespace Rexx
                     If (cSymb = Symbols.lowersym) Then
                         GetNextSymbol()
                         GenerateAsm(fct.upp, 0, 2)
-                    End If  
+                    End If
                     If (cSymb = Symbols.uppersym) Then
                         GetNextSymbol()
                         GenerateAsm(fct.upp, 0, 1)
@@ -1013,7 +1018,7 @@ Namespace Rexx
                         ItreX.Add(CurrRexxRun.IntCode.Count())
                     End If
                     TestSymbolExpected(Symbols.semicolon, 118)
-                ElseIf (cSymb = Symbols.signalsym) Then  ' signal novalue
+                ElseIf (cSymb = Symbols.signalsym) Then  ' signal on/off novalue  or  Signal label
                     GetNextSymbol()
                     If (cSymb = Symbols.ident And (cId = "ON" Or cId = "OFF")) Then
                         vId = cId
@@ -1022,8 +1027,13 @@ Namespace Rexx
                             GetNextSymbol()
                         End If
                         If vId = "ON" Then
+                            Dim nrVars As Integer = CurrRexxRun.IdName.Count()
                             i = SourceNameIndexPosition(cId, tpSymbol.tpProcedure, DefVars)
-                            If DefVars.Kind <> tpSymbol.tpProcedure Then SigError(105)
+                            If i > nrVars Then 'added now
+                                CurrRexxRun.IdName.Remove(i)
+                                i = 0
+                            End If
+                            If DefVars.Kind <> tpSymbol.tpProcedure Then SigError(105) ' if defined now, will be corrected when inserting labels 
                             GenerateAsm(fct.sig, 1, i)
                         Else
                             GenerateAsm(fct.sig, 0, 0)
@@ -2305,6 +2315,7 @@ Namespace Rexx
                 CurrRexxRun.CallStack.Add(MainElem)
                 StoreVar(CurrRexxRun.iRes, "", 0, "", "")
                 StoreVar(CurrRexxRun.iRc, "0", 0, "", "")
+                StoreVar(CurrRexxRun.iSigl, "0", 0, "", "")
                 IntPp = 1
                 CurrRexxRun.ProcNum = 0 ' not if in interpret !!!!!
                 CurrRexxRun.sigNovalue = False
@@ -3418,6 +3429,7 @@ Namespace Rexx
             If (CurrRexxRun.CAddress = "") Then CurrRexxRun.CAddress = CurrRexxRun.AddressS
             If (CurrRexxRun.CAddress = "") Then CurrRexxRun.CAddress = "EXTERN"
             Logg("""" & CurrRexxRun.CAddress.ToUpper(CultInf) & """")
+            Dim savLenStack as integer = Stack.Count
             SaveRegs()
             Dim savRun As RexxCompData = CurrRexxRun
             Dim e As New RexxEvent
@@ -3425,7 +3437,9 @@ Namespace Rexx
             Dim result As String = GetVar(CurrRexxRun.iRes, en, n) ' pass the RESULT to the caller
             CurrRexxRun = savRun
             savRun = Nothing
-            RestRegs()
+            While Stack.Count > savLenStack
+               RestRegs()
+            End While
             CurrRexxRun.Rc = e.rc
             StoreVar(CurrRexxRun.iRc, CStr(CurrRexxRun.Rc), k, en, n)
             StoreVar(CurrRexxRun.iRes, result, k, en, n)
@@ -3619,7 +3633,13 @@ Namespace Rexx
             NovalueDetect = False
             GetVarNV = GetVar(VarPosition, ExeName, RexxName)
             If NovalueDetect Then
-                intPP = CurrRexxRun.sigLabel - 1
+                If CurrRexxRun.sigLabel = 0 Then
+                    RunError(2, RexxName)
+                Else
+                    CurrRexxRun.sigNovalue = False ' don't signal in a signal trap
+                    StoreVar(CurrRexxRun.iSigl, CStr(SrcLstLin), 0, "SIGL", "SIGL")
+                    intPP = CurrRexxRun.sigLabel - 1
+                End If 
             End If
         End Function
         Public Function GetVar(ByRef VarPosition As Integer, ByRef ExeName As String, ByRef RexxName As String) As String
