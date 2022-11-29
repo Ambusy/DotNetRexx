@@ -556,7 +556,7 @@ Namespace Rexx
                             SigError(111)
                         End If
                         GetNextSymbol()
-                        Condition() ' Expression()
+                        Expression()
                         GenerateAsm(fct.sto, 0, i)
                         TestSymbolExpected(Symbols.semicolon, 118)
                     ElseIf (cSymb = Symbols.semicolon) Then  ' variabel command
@@ -570,7 +570,7 @@ Namespace Rexx
                             GenerateAsm(fct.lod, tpSymbol.tpConstant, StoreLiteral(" "))
                             GenerateAsm(fct.opr, 0, 8) ' concat
                         End If
-                        Condition() ' Expression()
+                        Expression()
                         GenerateAsm(fct.opr, 0, 8) ' concat
                         GenerateAsm(fct.exc, CurrRexxRun.iRc, 0)
                         TestSymbolExpected(Symbols.semicolon, 118)
@@ -669,7 +669,7 @@ Namespace Rexx
                         If cSymb = Symbols.eql Then ' do i=.... 
                             TypeDo = 3
                             GetNextSymbol()
-                            Condition() ' Expression()
+                            Expression()
                             GenerateAsm(fct.sto, 0, i) ' initial value
                             wsby = False
                             wsfor = False
@@ -678,7 +678,7 @@ Namespace Rexx
                                 j = SourceNameIndexPosition(Left(cId, 1).ToLower() & " " & CStr(nDo), tpSymbol.tpVariable, DefVars)
                                 svs = cSymb
                                 GetNextSymbol()
-                                Condition() ' Expression()
+                                Expression()
                                 GenerateAsm(fct.sto, 0, j) ' final value
                                 If (svs = Symbols.tosym) Then
                                     wstoi = j
@@ -728,7 +728,7 @@ Namespace Rexx
                             cChara = " "c
                             ncChar = ""
                             GetNextSymbol() '  re-read identifier
-                            Condition() ' Expression()
+                            Expression()
                             LoopVar = "LV " & CStr(nDo)
                             i = SourceNameIndexPosition(LoopVar, tpSymbol.tpVariable, DefVars)
                             GenerateAsm(fct.sto, 0, i) ' LVn = start
@@ -741,7 +741,7 @@ Namespace Rexx
                         End If
                     ElseIf cSymb <> Symbols.whilesym And cSymb <> Symbols.untilsym Then ' do number
                         TypeDo = 4
-                        Condition() ' Expression()
+                        Condition()
                         LoopVar = "LV " & CStr(nDo)
                         i = SourceNameIndexPosition(LoopVar, tpSymbol.tpVariable, DefVars)
                         GenerateAsm(fct.sto, 0, i) ' LVn = start
@@ -883,7 +883,7 @@ Namespace Rexx
                     If cSymb = Symbols.semicolon Then
                         GenerateAsm(fct.lod, tpSymbol.tpConstant, StoreLiteral(""))
                     Else
-                        Condition() ' Expression()
+                        Expression()
                     End If
                     GenerateAsm(fct.say, 0, 0)
                     TestSymbolExpected(Symbols.semicolon, 118)
@@ -893,7 +893,7 @@ Namespace Rexx
                     If (cSymb = Symbols.semicolon) Then
                         GenerateAsm(fct.lod, tpSymbol.tpConstant, 1) ' load literal "0" , always 1st in list
                     Else
-                        Condition() ' Expression()
+                        Expression()
                     End If
                     GenerateAsm(fct.sto, 0, CurrRexxRun.iRes)
                     If (vSymb = Symbols.exitsym) Then
@@ -992,12 +992,12 @@ Namespace Rexx
                     argGen(fct.pul)
                 ElseIf (cSymb = Symbols.pushsym) Then  ' push
                     GetNextSymbol()
-                    Condition() ' Expression()
+                    Expression()
                     GenerateAsm(fct.stk, 0, 0)
                     TestSymbolExpected(Symbols.semicolon, 118)
                 ElseIf (cSymb = Symbols.queuesym) Then  ' queue
                     GetNextSymbol()
-                    Condition() ' Expression()
+                    Expression()
                     GenerateAsm(fct.stk, 1, 0)
                     TestSymbolExpected(Symbols.semicolon, 118)
                 ElseIf (cSymb = Symbols.leavesym Or cSymb = Symbols.itersym) Then  ' leave/iter
@@ -1066,7 +1066,7 @@ Namespace Rexx
                 ElseIf (cSymb = Symbols.itpsym) Then  ' interpret
                     GetNextSymbol()
                     If cSymb <> Symbols.semicolon Then
-                        Condition() ' Expression()
+                        Expression()
                         GenerateAsm(fct.itp, 0, 0)
                     End If
                     TestSymbolExpected(Symbols.semicolon, 118)
@@ -1272,8 +1272,7 @@ Namespace Rexx
             If iMaxParSeqNr < iCurrParSeqNr Then iMaxParSeqNr = iCurrParSeqNr
             pn = "P " & CStr(iCurrParSeqNr)
             i = SourceNameIndexPosition(pn, tpSymbol.tpVariable, DefVars)
-            Condition() ' Expression()
-            'achteraf 1 Of 0, Als procedure
+            Expression()
             GenerateAsm(fct.sto, ixProcName, i) ' store final value of parameter n in next level 
         End Sub
         Private Sub Factor(ByRef restExpression As Boolean)
@@ -1326,7 +1325,7 @@ Namespace Rexx
                 GetNextSymbol()
             ElseIf (cSymb = Symbols.lparen) Then
                 GetNextSymbol()
-                Condition() ' Expression()
+                Expression()
                 If (cSymb <> Symbols.rparen) Then
                     SigError(106)
                 Else
@@ -1352,7 +1351,6 @@ Namespace Rexx
         End Sub
         Private Sub ConditionAnd()
             Dim nBrOpen As Integer
-            Dim relop As Symbols
             If cSymb = Symbols.notsym Then
                 GetNextSymbol()
                 ConditionAnd()
@@ -1364,51 +1362,61 @@ Namespace Rexx
                 If cSymb = Symbols.rparen Then
                     nBrOpen -= 1
                     GetNextSymbol()
+                    ' the operand continues with more expression elements, the first element is already processed
                     If (cSymb = Symbols.plus Or cSymb = Symbols.minus Or cSymb = Symbols.times Or cSymb = Symbols.idiv Or cSymb = Symbols.moddiv Or cSymb = Symbols.slash Or cSymb = Symbols.powr) Then
                         Expression(True)
                     End If
+                    GenerateCondOperand()
                 Else
                     If nBrOpen > 0 Then SigError(119)
                 End If
             Else
                 Expression()
-                While cSymb = Symbols.rparen And nBrOpen > 0
+                If cSymb = Symbols.rparen And nBrOpen > 0 Then ' else pass ) to higher level
                     nBrOpen -= 1
                     GetNextSymbol()
-                End While
+                End If
                 If (cSymb = Symbols.plus Or cSymb = Symbols.minus Or cSymb = Symbols.times Or cSymb = Symbols.idiv Or cSymb = Symbols.moddiv Or cSymb = Symbols.slash Or cSymb = Symbols.powr) Then
                     Expression(True)
                 End If
-                If (cSymb = Symbols.eql Or cSymb = Symbols.eqlstr Or cSymb = Symbols.lss Or cSymb = Symbols.lssstr Or cSymb = Symbols.leq Or cSymb = Symbols.leqstr Or cSymb = Symbols.gtr Or cSymb = Symbols.gtrstr Or cSymb = Symbols.geq Or cSymb = Symbols.geqstr Or cSymb = Symbols.neq Or cSymb = Symbols.neqstr) Then
-                    relop = cSymb
+                GenerateCondOperand()
+                If cSymb = Symbols.rparen And nBrOpen > 0 Then ' else pass ) to higher level
+                    nBrOpen -= 1
                     GetNextSymbol()
-                    Expression()
-                    If (relop = Symbols.eql) Then
-                        GenerateAsm(fct.opr, 0, 13)
-                    ElseIf (relop = Symbols.neq) Then
-                        GenerateAsm(fct.opr, 0, 15)
-                    ElseIf (relop = Symbols.lss) Then
-                        GenerateAsm(fct.opr, 0, 16)
-                    ElseIf (relop = Symbols.leq) Then
-                        GenerateAsm(fct.opr, 0, 17)
-                    ElseIf (relop = Symbols.gtr) Then
-                        GenerateAsm(fct.opr, 0, 18)
-                    ElseIf (relop = Symbols.geq) Then
-                        GenerateAsm(fct.opr, 0, 19)
-                    ElseIf (relop = Symbols.eqlstr) Then
-                        GenerateAsm(fct.opr, 0, 13 + strDelta)
-                    ElseIf (relop = Symbols.neqstr) Then
-                        GenerateAsm(fct.opr, 0, 15 + strDelta)
-                    ElseIf (relop = Symbols.lssstr) Then
-                        GenerateAsm(fct.opr, 0, 16 + strDelta)
-                    ElseIf (relop = Symbols.leqstr) Then
-                        GenerateAsm(fct.opr, 0, 17 + strDelta)
-                    ElseIf (relop = Symbols.gtrstr) Then
-                        GenerateAsm(fct.opr, 0, 18 + strDelta)
-                    ElseIf (relop = Symbols.geqstr) Then
-                        GenerateAsm(fct.opr, 0, 19 + strDelta)
-                    End If
                 End If
+            End If
+        End Sub
+        Sub GenerateCondOperand()
+            If (cSymb = Symbols.eql Or cSymb = Symbols.eqlstr Or cSymb = Symbols.lss Or cSymb = Symbols.lssstr Or cSymb = Symbols.leq Or cSymb = Symbols.leqstr Or cSymb = Symbols.gtr Or cSymb = Symbols.gtrstr Or cSymb = Symbols.geq Or cSymb = Symbols.geqstr Or cSymb = Symbols.neq Or cSymb = Symbols.neqstr) Then
+                Dim relop As Symbols = cSymb
+                GetNextSymbol()
+                Expression()
+                If (relop = Symbols.eql) Then
+                    GenerateAsm(fct.opr, 0, 13)
+                ElseIf (relop = Symbols.neq) Then
+                    GenerateAsm(fct.opr, 0, 15)
+                ElseIf (relop = Symbols.lss) Then
+                    GenerateAsm(fct.opr, 0, 16)
+                ElseIf (relop = Symbols.leq) Then
+                    GenerateAsm(fct.opr, 0, 17)
+                ElseIf (relop = Symbols.gtr) Then
+                    GenerateAsm(fct.opr, 0, 18)
+                ElseIf (relop = Symbols.geq) Then
+                    GenerateAsm(fct.opr, 0, 19)
+                ElseIf (relop = Symbols.eqlstr) Then
+                    GenerateAsm(fct.opr, 0, 13 + strDelta)
+                ElseIf (relop = Symbols.neqstr) Then
+                    GenerateAsm(fct.opr, 0, 15 + strDelta)
+                ElseIf (relop = Symbols.lssstr) Then
+                    GenerateAsm(fct.opr, 0, 16 + strDelta)
+                ElseIf (relop = Symbols.leqstr) Then
+                    GenerateAsm(fct.opr, 0, 17 + strDelta)
+                ElseIf (relop = Symbols.gtrstr) Then
+                    GenerateAsm(fct.opr, 0, 18 + strDelta)
+                ElseIf (relop = Symbols.geqstr) Then
+                    GenerateAsm(fct.opr, 0, 19 + strDelta)
+                End If
+
             End If
         End Sub
         Private Const strDelta As Integer = 9
